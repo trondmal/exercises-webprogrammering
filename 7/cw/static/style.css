@@ -1,0 +1,55 @@
+* {
+    font-family: Verdana, Arial, sans-serif;
+}
+
+body {
+    max-height: 100vh;
+}
+
+#board {
+    margin: 0 auto;
+    margin-top: 20px;
+}
+
+.square {
+    float: left;
+    background: white;
+}
+
+/* gamestat */
+
+#gamestat {
+    height: 40px;
+    width: 800px;
+    padding: 20px;
+    margin: 0 auto;
+    background-color: #ececec;
+}
+
+#gamestat div {
+    width: 33%;
+    float: left;
+}
+
+.score {
+    border: 1px solid black;
+    font-size: 1.2em;
+    font-weight: bold;
+    padding: 0.2em;
+}
+
+#player2 {
+    text-align: right;
+}
+
+#player1 .score {
+    background-color: #FFA8A8;
+}
+
+#player2 .score {
+    background-color: #A5DBEB;
+}
+
+#stat {
+    text-align: center;
+}
