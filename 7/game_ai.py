@@ -10,6 +10,11 @@ from cw.board import Board
 SERVER = "http://127.0.0.1:5000"  # this will not change
 TEAM_ID = "ErlendMoen"  # set it to your GitHub username
 
+class AI:
+    def __init__(self):
+        self.__board = Board(7)
+        self.__legalMoves = []
+        
 
 def reg():
     # register using a fixed team_id
@@ -27,6 +32,7 @@ def reg():
 def play(player):
     game_over = False
     board = Board(7)
+
     while not game_over:
         time.sleep(0.5)  # wait a bit before making a new status request
         status = requests.get(SERVER + "/status").json()  # request the status of the game
@@ -40,12 +46,13 @@ def play(player):
                 board.add_border(int(move_x), int(move_y), move_border, int(player))
             # we make a random move => note that this might be an invalid move (segment may be occupied)
             # TODO: figure out a smart move
-            x = random.randint(0,6)
+
+            """ x = random.randint(0,6)
             y = random.randint(0,6)
             border = ["top", "right", "bottom", "left"][random.randint(0,3)]
             print("Making a move: ({},{}) {}".format(x, y, border))
             move = str(x) + "," + str(y) + "," + border
-            status = requests.get(SERVER + "/move/" + TEAM_ID + "/" + move).json()
+            status = requests.get(SERVER + "/move/" + TEAM_ID + "/" + move).json() """
 
 
 if __name__ == "__main__":
