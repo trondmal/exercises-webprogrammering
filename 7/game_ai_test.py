@@ -40,12 +40,16 @@ def play(player):
                 board.add_border(int(move_x), int(move_y), move_border, int(player))
             # we make a random move => note that this might be an invalid move (segment may be occupied)
             # TODO: figure out a smart move
-            """ x = random.randint(0,6)
-            y = random.randint(0,6)
-            border = ["top", "right", "bottom", "left"][random.randint(0,3)]
-            print("Making a move: ({},{}) {}".format(x, y, border))
-            move = str(x) + "," + str(y) + "," + border
-            status = requests.get(SERVER + "/move/" + TEAM_ID + "/" + move).json() """
+            while True:
+                x = random.randint(0,6)
+                y = random.randint(0,6)
+                border = ["top", "right", "bottom", "left"][random.randint(0,3)]
+                if (not board.has_border(x,y,border)) and (not board.is_occupied(x,y)):
+                    board.add_border(x,y,border,player)
+                    print("Making a move: ({},{}) {}".format(x, y, border))
+                    move = str(x) + "," + str(y) + "," + border
+                    status = requests.get(SERVER + "/move/" + TEAM_ID + "/" + move).json()
+                    break
 
 
 if __name__ == "__main__":

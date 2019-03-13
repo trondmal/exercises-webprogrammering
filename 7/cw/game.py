@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 class Game():
     BOARD_SIZE = 7
-    TIMEOUT = 3  # timeout in seconds; change it to -1 for no timeout
+    TIMEOUT = -1  # timeout in seconds; change it to -1 for no timeout
 
     STATUS = {  # status codes and their meanings
         100: "The game has not started yet (waiting for both players)",
