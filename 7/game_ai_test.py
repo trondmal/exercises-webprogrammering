@@ -5,11 +5,129 @@ Game AI -- this is for you to complete
 import requests
 import time
 import random
-from cw.board import Board
+import copy
+
 
 SERVER = "http://127.0.0.1:5000"  # this will not change
-TEAM_ID = "test"  # set it to your GitHub username
+TEAM_ID = "n00b"  # set it to your GitHub username
 
+class Board():
+    BORDERS = {"top": 1, "right": 2, "bottom": 4, "left": 8}
+
+    def __init__(self, size=7):
+        self.__size = size
+        # init board
+        self.__board = []  # indexed as [y][x], that is, row then column
+        for i in range(size):
+            self.__board.append([0] * size)
+        # how many colored squares each player has
+        self.__colored = [0, 0]
+
+    def has_border(self, x, y, border):
+        """Checks if the square has a given border"""
+        return self.__board[y][x] & self.BORDERS[border]
+
+    def add_border(self, x, y, border, player):
+        """Adds border to a given side."""
+        self.__board[y][x] += self.BORDERS[border]
+        self.__occupy(x, y, player)
+        # also add border to the neighboring square
+        if border == "top":
+            if y > 0:
+                self.__board[y - 1][x] += self.BORDERS["bottom"]
+                self.__occupy(x, y - 1, player)
+        elif border == "right":
+            if x < self.__size - 1:
+                self.__board[y][x + 1] += self.BORDERS["left"]
+                self.__occupy(x + 1, y, player)
+        elif border == "bottom":
+            if y < self.__size - 1:
+                self.__board[y + 1][x] += self.BORDERS["top"]
+                self.__occupy(x, y + 1, player)
+        elif border == "left":
+            if x > 0:
+                self.__board[y][x - 1] += self.BORDERS["right"]
+                self.__occupy(x - 1, y, player)
+
+    def __occupy(self, x, y, player):
+        """Checks if a new area will get occupied by the given player."""
+        queue = [(x, y)]
+        area = []
+        closed = True
+        while closed and len(queue) > 0:
+            (x, y) = queue.pop(0)
+            if (x, y) in area:
+                continue
+            area.append((x, y))
+            #print("Q: ", queue)
+            #print("A: ", area)
+            # try to extend in possible directions
+            if not self.has_border(x, y, "top"):
+                if y == 0:  # leaving the board
+                    closed = False
+                queue.append((x, y - 1))
+            if not self.has_border(x, y, "right"):
+                if x == self.__size - 1:  # leaving the board
+                    closed = False
+                queue.append((x + 1, y))
+            if not self.has_border(x, y, "bottom"):
+                if y == self.__size - 1:  # leaving the board
+                    closed = False
+                queue.append((x, y + 1))
+            if not self.has_border(x, y, "left"):
+                if x == 0:  # leaving the board
+                    closed = False
+                queue.append((x - 1, y))
+
+        if closed:  # closed area => occupy it by player
+            for (x, y) in area:
+                self.__board[y][x] += player * 16
+                self.__colored[player - 1] += 1
+
+    def is_occupied(self, x, y):
+        """Checks if a given square is occupied. 0: no, 1: player1, 2: player2."""
+        return (self.__board[y][x] & 16) + (self.__board[y][x] & 32) * 2
+
+    def get_size(self):
+        return self.__size
+
+    def get_board(self):
+        return self.__board
+
+    def get_colored(self):
+        return self.__colored
+
+def smartMove(board,player):
+    
+    max_score = [-1, -1, "", board.get_colored()[player-1]]
+    legal_moves = []
+    for x in range(7):
+        for y in range(7):
+            for border in ["top","right","bottom","left"]:
+                if ((not board.has_border(x, y, border)) and (not board.is_occupied(x, y))):
+                    
+                    tempBoard = copy.deepcopy(board)
+                    tempBoard.add_border(x, y, border, player)
+                    if tempBoard.get_colored()[player-1] > max_score[3]:
+                        print("updated max score: ", tempBoard.get_colored()[player-1])
+                        max_score = [x, y, border, tempBoard.get_colored()[player-1]]
+                    else:
+                        
+                        legal_moves.append([x, y, border])
+
+    if max_score[3] == board.get_colored()[player-1]:
+        i = random.randrange(len(legal_moves))
+        print("index: ", i)
+        m = legal_moves[i]
+        board.add_border(m[0],m[1],m[2],player)
+        print("Making a move: ({},{}) {}".format(m[0], m[1], m[2]))
+        move = str(m[0]) + "," + str(m[1]) + "," + m[2]
+        status = requests.get(SERVER + "/move/" + TEAM_ID + "/" + move).json()
+    else:
+        board.add_border(max_score[0],max_score[1],max_score[2],player)
+        print("Making a move: ({},{}) {}".format(max_score[0], max_score[1], max_score[2]))
+        move = str(max_score[0]) + "," + str(max_score[1]) + "," + max_score[2]
+        status = requests.get(SERVER + "/move/" + TEAM_ID + "/" + move).json()
 
 def reg():
     # register using a fixed team_id
@@ -27,29 +145,25 @@ def reg():
 def play(player):
     game_over = False
     board = Board(7)
+
     while not game_over:
         time.sleep(0.5)  # wait a bit before making a new status request
-        status = requests.get(SERVER + "/status").json()  # request the status of the game
+        # request the status of the game
+        status = requests.get(SERVER + "/status").json()
         if status["status_code"] > 300:
             game_over = True
         elif status["status_code"] == 200 + player:  # it's our turn
             print("It's our turn ({}ms left)".format(status["time_left"]))
-            move = status["last_move"]
-            if move != "":
-                move_x, move_y, move_border = move.split(",")
-                board.add_border(int(move_x), int(move_y), move_border, int(player))
-            # we make a random move => note that this might be an invalid move (segment may be occupied)
-            # TODO: figure out a smart move
-            while True:
-                x = random.randint(0,6)
-                y = random.randint(0,6)
-                border = ["top", "right", "bottom", "left"][random.randint(0,3)]
-                if (not board.has_border(x,y,border)) and (not board.is_occupied(x,y)):
-                    board.add_border(x,y,border,player)
-                    print("Making a move: ({},{}) {}".format(x, y, border))
-                    move = str(x) + "," + str(y) + "," + border
-                    status = requests.get(SERVER + "/move/" + TEAM_ID + "/" + move).json()
-                    break
+            lastMove = status["last_move"]
+            if lastMove != "":
+                # add last move to board
+                move_x, move_y, move_border = lastMove.split(",")
+                if player == 1:
+                    move_player = 2
+                elif player == 2:
+                    move_player = 1
+                board.add_border(int(move_x), int(move_y), move_border, move_player)
+            smartMove(board,player)
 
 
 if __name__ == "__main__":

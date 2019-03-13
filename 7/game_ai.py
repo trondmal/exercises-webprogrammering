@@ -5,6 +5,7 @@ Game AI -- this is for you to complete
 import requests
 import time
 import random
+import copy
 
 
 SERVER = "http://127.0.0.1:5000"  # this will not change
@@ -96,11 +97,37 @@ class Board():
     def get_colored(self):
         return self.__colored
 
-def smartMove(board):
-    tempBoard = board
-    for x in range(6):
-        for y in range(6):
-            pass
+def greedyMove(board,player):
+    
+    max_score = [-1, -1, "", board.get_colored()[player-1]]
+    legal_moves = []
+    for x in range(7):
+        for y in range(7):
+            for border in ["top","right","bottom","left"]:
+                if ((not board.has_border(x, y, border)) and (not board.is_occupied(x, y))):
+                    
+                    tempBoard = copy.deepcopy(board)
+                    tempBoard.add_border(x, y, border, player)
+                    if tempBoard.get_colored()[player-1] > max_score[3]:
+                        print("updated max score: ", tempBoard.get_colored()[player-1])
+                        max_score = [x, y, border, tempBoard.get_colored()[player-1]]
+                    else:
+                        
+                        legal_moves.append([x, y, border])
+
+    if max_score[3] == board.get_colored()[player-1]:
+        i = random.randrange(len(legal_moves))
+        print("index: ", i)
+        m = legal_moves[i]
+        board.add_border(m[0],m[1],m[2],player)
+        print("Making a move: ({},{}) {}".format(m[0], m[1], m[2]))
+        move = str(m[0]) + "," + str(m[1]) + "," + m[2]
+        status = requests.get(SERVER + "/move/" + TEAM_ID + "/" + move).json()
+    else:
+        board.add_border(max_score[0],max_score[1],max_score[2],player)
+        print("Making a move: ({},{}) {}".format(max_score[0], max_score[1], max_score[2]))
+        move = str(max_score[0]) + "," + str(max_score[1]) + "," + max_score[2]
+        status = requests.get(SERVER + "/move/" + TEAM_ID + "/" + move).json()
 
 def reg():
     # register using a fixed team_id
@@ -136,17 +163,7 @@ def play(player):
                 elif player == 2:
                     move_player = 1
                 board.add_border(int(move_x), int(move_y), move_border, move_player)
-
-            while True:
-                x = random.randint(0, 6)
-                y = random.randint(0, 6)
-                border = ["top", "right", "bottom", "left"][random.randint(0, 3)]
-                if (not board.has_border(x, y, border)) and not board.is_occupied(x, y):
-                    board.add_border(x, y, border, player)
-                    print("Making a move: ({},{}) {}".format(x, y, border))
-                    move = str(x) + "," + str(y) + "," + border
-                    status = requests.get(SERVER + "/move/" + TEAM_ID + "/" + move).json()
-                    break
+            greedyMove(board,player)
 
 
 if __name__ == "__main__":
