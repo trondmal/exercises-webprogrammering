@@ -129,6 +129,63 @@ def greedyMove(board,player):
         move = str(max_score[0]) + "," + str(max_score[1]) + "," + max_score[2]
         status = requests.get(SERVER + "/move/" + TEAM_ID + "/" + move).json()
 
+def deep(board, player, depth):
+    if player == 1:
+            next_player = 2
+
+    elif player == 2:
+        next_player = 1
+
+    if depth <= 0:
+        return board.get_colored()[0]-board.get_colored()[1]
+    else:
+        #max_score = [-1, -1, "", board.get_colored()[player-1]]
+        max_score = board.get_colored()[0]-board.get_colored()[1]
+
+        for x in range(7):
+            for y in range(7):
+                for border in ["top","right","bottom","left"]:
+                    if ((not board.has_border(x, y, border)) and (not board.is_occupied(x, y))):
+                    
+                        tempBoard = copy.deepcopy(board)
+                        tempBoard.add_border(x, y, border, next_player) # make move for "next" player
+                        score = deep(tempBoard, next_player, depth-1) #calculate score for current player
+
+                        if score > max_score:
+                            max_score = score
+        return max_score 
+
+def deepMove(board,player,depth):
+    max_score_move = [-1, -1, "", -1000] #x,y,border,score
+    legal_moves =[]
+    for x in range(7):
+        for y in range(7):
+            for border in ["top","right", "bottom", "left"]:
+                if ((not board.has_border(x,y,border)) and (not board.is_occupied(x,y))):
+                    tempBoard = copy.deepcopy(board)
+                    tempBoard.add_border(x,y,border,player) # make move for current player
+                    score = deep(tempBoard, player, depth) #calculate relative score of move recursively
+                    if player == 2:
+                        score *= -1
+                    if score > max_score_move[3]:
+                        max_score_move = [x,y,border,score]
+                    else:
+                        legal_moves.append([x,y,border])
+    print("Score: ", max_score_move[3])
+    if max_score_move[3] <= board.get_colored()[player-1]:
+        i = random.randrange(len(legal_moves))
+        print("index: ", i)
+        m = legal_moves[i]
+        board.add_border(m[0],m[1],m[2],player)
+        print("Making a move: ({},{}) {}".format(m[0], m[1], m[2]))
+        move = str(m[0]) + "," + str(m[1]) + "," + m[2]
+        status = requests.get(SERVER + "/move/" + TEAM_ID + "/" + move).json()
+    else:
+        board.add_border(max_score_move[0],max_score_move[1],max_score_move[2],player)
+        print("Making a move: ({},{}) {}".format(max_score_move[0], max_score_move[1], max_score_move[2]))
+        move = str(max_score_move[0]) + "," + str(max_score_move[1]) + "," + max_score_move[2]
+        status = requests.get(SERVER + "/move/" + TEAM_ID + "/" + move).json()
+
 def reg():
     # register using a fixed team_id
     resp = requests.get(SERVER + "/reg/" + TEAM_ID).json()  # register 1st team
@@ -145,7 +202,7 @@ def reg():
 def play(player):
     game_over = False
     board = Board(7)
-
+    move_nr = 0
     while not game_over:
         time.sleep(0.5)  # wait a bit before making a new status request
         # request the status of the game
@@ -153,19 +210,24 @@ def play(player):
         if status["status_code"] > 300:
             game_over = True
         elif status["status_code"] == 200 + player:  # it's our turn
+            move_nr += 1
             print("It's our turn ({}ms left)".format(status["time_left"]))
             lastMove = status["last_move"]
             if lastMove != "":
                 # add last move to board
-                move_x, move_y, move_border = lastMove.split(",")
+                last_x, last_y, last_border = lastMove.split(",")
                 if player == 1:
-                    move_player = 2
+                    last_player = 2
                 elif player == 2:
-                    move_player = 1
-                board.add_border(int(move_x), int(move_y), move_border, move_player)
-            greedyMove(board,player)
+                    last_player = 1
+                board.add_border(int(last_x), int(last_y), last_border, last_player)
+            if move_nr < 35:
+                greedyMove(board,player)
+            else:
+                deepMove(board,player,2)
 
 
 if __name__ == "__main__":
+    
     player = reg()
     play(player)
