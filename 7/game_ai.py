@@ -97,37 +97,74 @@ class Board():
     def get_colored(self):
         return self.__colored
 
-def greedyMove(board,player):
-    
-    max_score = [-1, -1, "", board.get_colored()[player-1]]
-    legal_moves = []
-    for x in range(7):
-        for y in range(7):
-            for border in ["top","right","bottom","left"]:
-                if ((not board.has_border(x, y, border)) and (not board.is_occupied(x, y))):
-                    
-                    tempBoard = copy.deepcopy(board)
-                    tempBoard.add_border(x, y, border, player)
-                    if tempBoard.get_colored()[player-1] > max_score[3]:
-                        print("updated max score: ", tempBoard.get_colored()[player-1])
-                        max_score = [x, y, border, tempBoard.get_colored()[player-1]]
-                    else:
-                        
-                        legal_moves.append([x, y, border])
-
-    if max_score[3] == board.get_colored()[player-1]:
-        i = random.randrange(len(legal_moves))
+def greedyMove(board,player,possible_moves):
+    if player == 1:
+        opponent =2
+    else:
+        opponent = 1
+    max_score = [-1, -1, "", -100]
+    for move in possible_moves:
+        x,y,border = move[0], move[1], move[2]
+        if not(board.is_occupied(x,y)) and not (board.has_border(x,y,border)):            
+            tempBoard = copy.deepcopy(board)
+            tempBoard.add_border(x, y, border, player)
+            tempPossibleMoves = copy.deepcopy(possible_moves)
+            removeFromPossible(x,y,border,tempPossibleMoves)
+            score = tempBoard.get_colored()[player-1] - opponentScore(tempBoard,opponent,tempPossibleMoves)
+            if score > max_score[3]:
+                print("updated max score: ", score)
+                max_score = [x, y, border, score]
+        else:
+            removeFromPossible(x,y,border,possible_moves)
+    if [max_score[0],max_score[1],max_score[2]] not in possible_moves: #make random move if best move is not possible
+        i = random.randrange(len(possible_moves))
         print("index: ", i)
-        m = legal_moves[i]
+        m = possible_moves.pop(i)
         board.add_border(m[0],m[1],m[2],player)
         print("Making a move: ({},{}) {}".format(m[0], m[1], m[2]))
         move = str(m[0]) + "," + str(m[1]) + "," + m[2]
         status = requests.get(SERVER + "/move/" + TEAM_ID + "/" + move).json()
     else:
+        removeFromPossible(max_score[0],max_score[1],max_score[2],possible_moves)
         board.add_border(max_score[0],max_score[1],max_score[2],player)
         print("Making a move: ({},{}) {}".format(max_score[0], max_score[1], max_score[2]))
         move = str(max_score[0]) + "," + str(max_score[1]) + "," + max_score[2]
         status = requests.get(SERVER + "/move/" + TEAM_ID + "/" + move).json()
+
+def opponentScore(board,player,possible_moves):
+    max_score = 0
+    for move in possible_moves:
+        x,y,border = move[0], move[1], move[2]
+        if not(board.is_occupied(x,y)) and not (board.has_border(x,y,border)): 
+            x,y,border = move[0],move[1],move[2]
+            tempBoard = copy.deepcopy(board)
+            tempBoard.add_border(x,y,border,player)
+            score = tempBoard.get_colored()[player-1]
+            if score > max_score:
+                max_score = score
+    return max_score
+
+
+def possibleMoves():
+    moves = []
+    for x in range(7):
+        for y in range(7):
+            if x == 0:
+                moves.append([x,y,"left"])
+            if y == 0: 
+                moves.append([x,y,"top"])
+            moves.append([x,y,"right"])
+            moves.append([x,y,"bottom"])
+    return moves
+
+def removeFromPossible(x,y,border,possible_moves):
+    if [x,y,border] in possible_moves:
+        possible_moves.remove([x,y,border])
+    else:
+        if border == "top":
+            possible_moves.remove([x,y-1,"bottom"])
+        elif border == "left":
+            possible_moves.remove([x-1,y,"right"])
 
 def deep(board, player, depth):
     if player == 1:
@@ -140,7 +177,7 @@ def deep(board, player, depth):
         return board.get_colored()[0]-board.get_colored()[1]
     else:
         #max_score = [-1, -1, "", board.get_colored()[player-1]]
-        max_score = board.get_colored()[0]-board.get_colored()[1]
+        max_score = 0
 
         for x in range(7):
             for y in range(7):
@@ -149,8 +186,10 @@ def deep(board, player, depth):
                     
                         tempBoard = copy.deepcopy(board)
                         tempBoard.add_border(x, y, border, next_player) # make move for "next" player
-                        score = deep(tempBoard, next_player, depth-1) #calculate score for current player
-
+                        if depth%2 == 0:
+                            score = deep(tempBoard, next_player, depth-1) #calculate score for current player
+                        else:
+                            score = -deep(tempBoard, next_player, depth -1 )
                         if score > max_score:
                             max_score = score
         return max_score 
@@ -171,16 +210,17 @@ def deepMove(board,player,depth):
                         max_score_move = [x,y,border,score]
                     else:
                         legal_moves.append([x,y,border])
-    print("Score: ", max_score_move[3])
-    if max_score_move[3] <= board.get_colored()[player-1]:
+
+    if abs(max_score_move[3]) == 0:
         i = random.randrange(len(legal_moves))
-        print("index: ", i)
+        print("making random move: ",max_score_move[3])
         m = legal_moves[i]
         board.add_border(m[0],m[1],m[2],player)
         print("Making a move: ({},{}) {}".format(m[0], m[1], m[2]))
         move = str(m[0]) + "," + str(m[1]) + "," + m[2]
         status = requests.get(SERVER + "/move/" + TEAM_ID + "/" + move).json()
     else:
+        print("makeing best move: ", max_score_move)
         board.add_border(max_score_move[0],max_score_move[1],max_score_move[2],player)
         print("Making a move: ({},{}) {}".format(max_score_move[0], max_score_move[1], max_score_move[2]))
         move = str(max_score_move[0]) + "," + str(max_score_move[1]) + "," + max_score_move[2]
@@ -203,6 +243,8 @@ def play(player):
     game_over = False
     board = Board(7)
     move_nr = 0
+    possible_moves = possibleMoves()
+    random.shuffle(possible_moves)
     while not game_over:
         time.sleep(0.5)  # wait a bit before making a new status request
         # request the status of the game
@@ -221,10 +263,8 @@ def play(player):
                 elif player == 2:
                     last_player = 1
                 board.add_border(int(last_x), int(last_y), last_border, last_player)
-            if move_nr < 35:
-                greedyMove(board,player)
-            else:
-                deepMove(board,player,2)
+                removeFromPossible(int(last_x),int(last_y),last_border,possible_moves)
+            greedyMove(board,player,possible_moves)
 
 
 if __name__ == "__main__":
